@@ -235,3 +235,127 @@ class _AutoHidePointerState extends State<AutoHidePointer> {
     );
   }
 }
+
+/// TV layout with a menu column on the left and the content on the right.
+///
+/// Up/Down move within the side that has focus. Left from the content goes
+/// to the menu once nothing further left is focusable, and Right from the
+/// menu returns to the item that was focused before, so a long list never
+/// has to be scrolled back to the top to reach a control.
+class TvSideMenuLayout extends StatefulWidget {
+  const TvSideMenuLayout({super.key, required this.menu, required this.content, this.menuWidth = 260});
+
+  final List<Widget> menu;
+  final Widget content;
+  final double menuWidth;
+
+  @override
+  State<TvSideMenuLayout> createState() => _TvSideMenuLayoutState();
+}
+
+class _TvSideMenuLayoutState extends State<TvSideMenuLayout> {
+  final _menuScope = FocusScopeNode(debugLabel: 'side menu');
+  final _contentScope = FocusScopeNode(debugLabel: 'content');
+
+  @override
+  void dispose() {
+    _menuScope.dispose();
+    _contentScope.dispose();
+    super.dispose();
+  }
+
+  /// Focuses the scope's last focused item, or its first one.
+  static void _enter(FocusScopeNode scope) {
+    final last = scope.focusedChild;
+    if (last != null && last.canRequestFocus) {
+      last.requestFocus();
+    } else {
+      scope.requestFocus();
+      scope.nextFocus();
+    }
+  }
+
+  KeyEventResult _onContentKey(FocusNode node, KeyEvent event) {
+    if (event is KeyUpEvent || event.logicalKey != LogicalKeyboardKey.arrowLeft) return KeyEventResult.ignored;
+    final focused = FocusManager.instance.primaryFocus;
+    if (focused != null && focused.focusInDirection(TraversalDirection.left)) return KeyEventResult.handled;
+    _enter(_menuScope);
+    return KeyEventResult.handled;
+  }
+
+  KeyEventResult _onMenuKey(FocusNode node, KeyEvent event) {
+    if (event is KeyUpEvent || event.logicalKey != LogicalKeyboardKey.arrowRight) return KeyEventResult.ignored;
+    _enter(_contentScope);
+    return KeyEventResult.handled;
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        SizedBox(
+          width: widget.menuWidth,
+          child: FocusScope(
+            node: _menuScope,
+            onKeyEvent: _onMenuKey,
+            child: ListView(children: widget.menu),
+          ),
+        ),
+        const SizedBox(width: 24),
+        Expanded(
+          child: FocusScope(
+            node: _contentScope,
+            autofocus: true,
+            onKeyEvent: _onContentKey,
+            child: widget.content,
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+/// An entry of a [TvSideMenuLayout] menu; [selected] marks the active option.
+class TvMenuButton extends StatelessWidget {
+  const TvMenuButton({super.key, required this.icon, required this.label, required this.onSelect, this.selected = false});
+
+  final IconData icon;
+  final String label;
+  final VoidCallback onSelect;
+  final bool selected;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 4),
+      child: TvFocusable(
+        borderRadius: 12,
+        focusScale: 1,
+        onSelect: onSelect,
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+          child: Row(
+            children: [
+              Icon(icon, size: 28, color: selected ? theme.colorScheme.primary : null),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Text(
+                  label,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: theme.textTheme.titleSmall?.copyWith(
+                    fontWeight: selected ? FontWeight.bold : null,
+                    color: selected ? theme.colorScheme.primary : null,
+                  ),
+                ),
+              ),
+              if (selected) Icon(Icons.check, size: 24, color: theme.colorScheme.primary),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}

@@ -36,6 +36,13 @@ class _PlayerScreenState extends State<PlayerScreen> {
   final _subscriptions = <StreamSubscription<Object?>>[];
 
   late int _index = widget.index;
+  Timer? _saveTimer;
+
+  /// With mpv's save-position-on-quit, saves where each file is so it resumes
+  /// there next time: every 30 s while playing (survives a crash or power
+  /// cut) and when closing. The embedded player never runs mpv's `quit`, which
+  /// is the only time mpv saves by itself.
+  static const _saveInterval = Duration(seconds: 30);
   String? _error;
 
   NativePlayer get _mpv => _player.platform as NativePlayer;
@@ -67,6 +74,9 @@ class _PlayerScreenState extends State<PlayerScreen> {
     // under a decoder thread (SIGBUS/SIGSEGV in libavcodec, Panfrost GPU
     // page faults). Costs one frame copy.
     await _mpv.setProperty('vd-lavc-dr', 'no');
+    // mpv's watch-later files: opening a file resumes it where it was left
+    await _mpv.setProperty('watch-later-dir', '${config.dataDir}/watch_later');
+    await _mpv.setProperty('resume-playback', 'yes');
     final dir = config.mpvConfigDir;
     if (File('$dir/mpv.conf').existsSync()) await _mpv.command(['load-config-file', '$dir/mpv.conf']);
     if (File('$dir/input.conf').existsSync()) await _mpv.command(['load-input-conf', '$dir/input.conf']);
@@ -79,6 +89,9 @@ class _PlayerScreenState extends State<PlayerScreen> {
     for (final o in config.mpvOptions.entries) {
       await _mpv.setProperty(o.key, o.value);
     }
+    _saveTimer = Timer.periodic(_saveInterval, (_) {
+      if (_player.state.playing) _savePosition(_mpv);
+    });
     await _player.open(Playlist(
       [for (final f in widget.playlist) Media(f.path)],
       index: widget.index,
@@ -93,9 +106,11 @@ class _PlayerScreenState extends State<PlayerScreen> {
     // Disposing a player that is still decoding/rendering crashes the app
     // (use-after-free in libavcodec or Flutter's raster thread). Stop it
     // first and give mpv a moment to tear down its decoder and renderer.
+    _saveTimer?.cancel();
     final player = _player;
     unawaited(() async {
       try {
+        await _savePosition(player.platform as NativePlayer);
         await player.stop();
         await Future<void>.delayed(const Duration(milliseconds: 300));
       } finally {
@@ -103,6 +118,19 @@ class _PlayerScreenState extends State<PlayerScreen> {
       }
     }());
     super.dispose();
+  }
+
+  /// Writes mpv's watch-later entry for the current file, if mpv.conf has
+  /// save-position-on-quit. Not for a file that has played to the end, or it
+  /// would reopen at its last second.
+  static Future<void> _savePosition(NativePlayer mpv) async {
+    if (mpv.state.completed) return;
+    try {
+      if (await mpv.getProperty('save-position-on-quit') != 'yes') return;
+      await mpv.command(['write-watch-later-config']);
+    } catch (e) {
+      debugPrint('player: saving position failed: $e');
+    }
   }
 
   KeyEventResult _onKey(FocusNode node, KeyEvent event) {

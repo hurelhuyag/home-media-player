@@ -69,6 +69,8 @@ The installer:
 
 - sets kernel options in `/boot/armbianEnv.txt`: 1080p HDMI, and
   `pcie_aspm=off` so the SATA controller works
+- keeps the CPU at its stock 1.908 GHz (`/etc/tmpfiles.d/hc4-cpufreq.conf`);
+  the 2.0/2.1 GHz overclock steps Armbian allows were unstable on our board
 - installs the packages from the latest release and their dependencies
   (Chromium, cage, mpv, …)
 - builds the 5.1 HDMI audio modules for the running kernel (DKMS)
@@ -92,10 +94,17 @@ them as `... | sudo bash -s -- --reboot`.
 | ⏪ ⏩ / ⏮ ⏭      |                  | 30 s / previous, next file        | previous/next |
 | Blue / Red     |                  | audio track / subtitles           |               |
 | Green / Yellow |                  | stats / subtitles on-off          |               |
-| Menu           | sort files       | track list                        |               |
+| Menu           | next sort order  | track list                        |               |
 
 In YouTube the remote works as in YouTube's own TV app. **Home** always comes
 back to the launcher.
+
+In file lists, **Left** opens the menu on the left (sort by name or date
+modified, shuffle, folders first or mixed with files) from anywhere in the
+list, and **Right** goes back to the row you were on.
+
+Videos and music resume where you stopped (mpv's `save-position-on-quit`,
+saved every 30 s while playing, so also after a crash or power cut).
 
 Disks: internal SATA disks and USB drives are listed under Media and mounted
 when opened. To mount a disk at boot instead, add it to `/etc/fstab` (use

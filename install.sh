@@ -72,6 +72,14 @@ if [ "$HC4" = 1 ] && [ -f "$ARMBIAN_ENV" ]; then
     # The SATA controller drops off PCIe with link power management on
     set_kernel_arg "pcie_aspm=off"
     grep '^extraargs=' "$ARMBIAN_ENV"
+
+    # Stock CPU speed: the device tree also offers 2.016/2.1 GHz overclock
+    # steps, suspected of causing random crashes (compilers, video decoding)
+    printf '%s\n' \
+        "# ODROID-HC4: stay at the S905X3 stock 1.908 GHz (home-media-player)" \
+        "w /sys/devices/system/cpu/cpufreq/policy0/scaling_max_freq - - - - 1908000" \
+        > /etc/tmpfiles.d/hc4-cpufreq.conf
+    systemd-tmpfiles --create /etc/tmpfiles.d/hc4-cpufreq.conf || true
 fi
 
 # ---- packages -----------------------------------------------------------------
