@@ -1,0 +1,6 @@
+/* Like Android TV: no mouse pointer unless a mouse is actually being used
+   (bridge.js adds the class on movement, removes it on keys or when idle). */
+html:not(.hmp-pointer),
+html:not(.hmp-pointer) * {
+  cursor: none !important;
+}

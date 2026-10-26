@@ -1,0 +1,74 @@
+# Builds the .deb packages on GitHub's arm64 runners in a Debian 13 container
+# (the same base as Armbian trixie on the HC4). Pushing a tag like v0.2.0
+# publishes them, with install.sh, as a GitHub release.
+name: Build
+
+on:
+  push:
+    branches: [main]
+    tags: ['v*']
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+env:
+  FLUTTER_VERSION: 3.47.1
+
+jobs:
+  build:
+    runs-on: ubuntu-24.04-arm
+    container: debian:trixie
+    steps:
+      - name: Install build tools
+        run: |
+          apt-get update
+          DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
+            ca-certificates git curl unzip xz-utils make dpkg-dev build-essential \
+            clang cmake ninja-build pkg-config libstdc++-14-dev \
+            libgtk-3-dev libmpv-dev libepoxy-dev liblzma-dev
+
+      - uses: actions/checkout@v4
+
+      - name: Cache Flutter
+        uses: actions/cache@v4
+        with:
+          path: /opt/flutter
+          key: flutter-${{ env.FLUTTER_VERSION }}-linux-arm64
+
+      - name: Install Flutter
+        run: |
+          [ -x /opt/flutter/bin/flutter ] ||
+            git clone --depth 1 --branch "$FLUTTER_VERSION" https://github.com/flutter/flutter.git /opt/flutter
+          git config --global --add safe.directory /opt/flutter
+          echo /opt/flutter/bin >> "$GITHUB_PATH"
+
+      - name: Build the kiosk
+        working-directory: kiosk
+        run: |
+          flutter --suppress-analytics config --no-analytics
+          flutter --suppress-analytics pub get
+          flutter --suppress-analytics analyze
+          flutter --suppress-analytics build linux --release
+
+      - name: Package
+        run: |
+          case "$GITHUB_REF" in
+            refs/tags/v*) export VERSION="${GITHUB_REF_NAME#v}" ;;
+          esac
+          build/package.sh
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: packages
+          path: dist/*.deb
+
+      - name: Publish release
+        if: startsWith(github.ref, 'refs/tags/v')
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            dist/*.deb
+            install.sh
+          generate_release_notes: true

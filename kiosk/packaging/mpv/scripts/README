@@ -1,0 +1,2 @@
+Lua/JavaScript mpv scripts placed in this folder are loaded into the player,
+like ~/.config/mpv/scripts/.

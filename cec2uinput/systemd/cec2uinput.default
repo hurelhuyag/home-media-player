@@ -1,0 +1,7 @@
+# Options for cec2uinput, see `cec2uinput --help`.
+#   -n NAME   name shown in the TV's input / CEC device list (max 14 chars)
+#   -t TYPE   recording | playback | tuner. Some TVs forward more remote keys
+#             to one type than another; recording is what libcec uses.
+#   -p        wake the TV and switch to this input when the box starts
+#   -v        log every CEC message (journalctl -u cec2uinput)
+CEC2UINPUT_ARGS="-d /dev/cec0 -n YoutubeTV -t recording"

@@ -1,0 +1,40 @@
+[Unit]
+Description=Home Media Player kiosk on HDMI
+Documentation=https://github.com/hurelhuyag/home-media-player
+# Same shape as cage's own kiosk example: take over tty1 with a real logind
+# session, so cage gets DRM/input through logind and polkit sees an active seat.
+After=systemd-user-sessions.service plymouth-quit-wait.service
+Before=graphical.target
+ConditionPathExists=/dev/tty0
+Wants=dbus.socket systemd-logind.service
+After=dbus.socket systemd-logind.service
+Conflicts=getty@tty1.service
+After=getty@tty1.service
+
+[Service]
+Type=simple
+User=kiosk
+PAMName=home-media-player
+Environment=XDG_SESSION_TYPE=wayland
+# cage draws a transparent pointer, so the TV shows none unless an app shows
+# one; the kiosk and YouTube do that only while a mouse is actually moved.
+Environment=XCURSOR_PATH=/usr/share/home-media-player/icons XCURSOR_THEME=default XCURSOR_SIZE=24
+EnvironmentFile=-/etc/default/home-media-player
+ExecStart=/usr/bin/cage -d -s -- /usr/lib/home-media-player/session
+ExecStartPost=-+/usr/bin/chvt 1
+Restart=always
+RestartSec=3
+
+UtmpIdentifier=tty1
+UtmpMode=user
+TTYPath=/dev/tty1
+TTYReset=yes
+TTYVHangup=yes
+TTYVTDisallocate=yes
+StandardInput=tty-fail
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=graphical.target
+Alias=display-manager.service

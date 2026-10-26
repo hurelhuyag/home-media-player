@@ -1,0 +1,56 @@
+#!/usr/bin/env python3
+"""Play noise on chosen HDMI audio channels until Ctrl+C.
+
+    hdmi-channel-test 1 0 0 0 0 0      # only channel 1
+    hdmi-channel-test 0 0 0 0 1 1      # channels 5 and 6
+
+Six 0/1 arguments, one per channel in the order apps send 5.1 to ALSA:
+  1 front left, 2 front right, 3 rear left, 4 rear right, 5 center, 6 LFE
+The sound is noise plus a 60 Hz hum, so a subwoofer plays it too. It goes
+straight to the HDMI device with no reordering, to check where each channel
+really comes out. Stop the kiosk's playback first (the device is exclusive).
+Set DEVICE= to use another ALSA device.
+"""
+import array
+import math
+import os
+import random
+import subprocess
+import sys
+
+NAMES = ["front left", "front right", "rear left", "rear right", "center", "LFE"]
+RATE = 48000
+
+args = sys.argv[1:]
+if len(args) != 6 or any(a not in ("0", "1") for a in args):
+    sys.exit(__doc__)
+on = [a == "1" for a in args]
+device = os.environ.get("DEVICE", "hw:CARD=ODROIDHC4,DEV=0")
+
+print("Playing on: " + (", ".join(f"{i + 1} ({n})" for i, n in enumerate(NAMES) if on[i]) or "nothing"))
+print("Ctrl+C to stop.")
+
+# One second of interleaved 6-channel audio, looped
+buf = array.array("h")
+for i in range(RATE):
+    value = random.uniform(-0.2, 0.2) + 0.2 * math.sin(2 * math.pi * 60 * i / RATE)
+    sample = int(value * 32767)
+    buf.extend(sample if on[ch] else 0 for ch in range(6))
+data = buf.tobytes()
+
+player = subprocess.Popen(
+    ["aplay", "-q", "-D", device, "-t", "raw", "-f", "S16_LE", "-r", str(RATE), "-c", "6"],
+    stdin=subprocess.PIPE,
+)
+try:
+    while True:
+        player.stdin.write(data)
+except (KeyboardInterrupt, BrokenPipeError):
+    pass
+finally:
+    try:
+        player.stdin.close()
+    except BrokenPipeError:
+        pass
+    player.terminate()
+    player.wait()

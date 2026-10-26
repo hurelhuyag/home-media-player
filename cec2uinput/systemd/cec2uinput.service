@@ -1,0 +1,29 @@
+[Unit]
+Description=HDMI-CEC remote control to virtual keyboard
+Documentation=https://github.com/hurelhuyag/home-media-player
+After=systemd-modules-load.service
+
+[Service]
+Type=simple
+EnvironmentFile=-/etc/default/cec2uinput
+ExecStart=/usr/bin/cec2uinput $CEC2UINPUT_ARGS
+# /dev/cec0 shows up once the HDMI driver has probed; just retry until then
+Restart=always
+RestartSec=2
+
+DevicePolicy=closed
+DeviceAllow=/dev/uinput rw
+DeviceAllow=char-cec rw
+ProtectSystem=strict
+ProtectHome=yes
+PrivateTmp=yes
+PrivateNetwork=yes
+NoNewPrivileges=yes
+ProtectKernelTunables=yes
+ProtectControlGroups=yes
+RestrictAddressFamilies=AF_UNIX
+MemoryDenyWriteExecute=yes
+LockPersonality=yes
+
+[Install]
+WantedBy=multi-user.target

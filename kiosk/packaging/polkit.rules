@@ -1,0 +1,15 @@
+// The kiosk has no keyboard or password prompt: let it mount and eject
+// disks and reboot or power off the box.
+polkit.addRule(function (action, subject) {
+    if (subject.user != "kiosk")
+        return polkit.Result.NOT_HANDLED;
+    var id = action.id;
+    if (id.indexOf("org.freedesktop.udisks2.filesystem-mount") == 0 ||
+        id.indexOf("org.freedesktop.udisks2.filesystem-unmount-others") == 0 ||
+        id.indexOf("org.freedesktop.udisks2.eject-media") == 0 ||
+        id.indexOf("org.freedesktop.udisks2.power-off-drive") == 0 ||
+        id.indexOf("org.freedesktop.login1.reboot") == 0 ||
+        id.indexOf("org.freedesktop.login1.power-off") == 0)
+        return polkit.Result.YES;
+    return polkit.Result.NOT_HANDLED;
+});

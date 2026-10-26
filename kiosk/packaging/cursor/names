@@ -1,0 +1,5 @@
+default left_ptr arrow top_left_arrow pointer hand1 hand2 text xterm ibeam
+wait watch progress left_ptr_watch crosshair cross move fleur grab grabbing
+not-allowed no-drop context-menu help question_arrow cell all-scroll
+col-resize row-resize n-resize s-resize e-resize w-resize ne-resize nw-resize
+se-resize sw-resize ew-resize ns-resize nesw-resize nwse-resize zoom-in zoom-out
