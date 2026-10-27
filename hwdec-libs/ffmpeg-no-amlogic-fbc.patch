@@ -1,0 +1,28 @@
+FFmpeg: never pick Amlogic FBC (AM21C/AM21B) capture formats
+
+The meson-amvdec driver offers compressed AM21C as its only 10-bit
+capture format. Only the meson VPU overlay can display it; the player
+renders through the GPU (mpv's EGL dmabuf interop), which shows a blue
+picture, and copying back to memory fails. Skipping it makes FFmpeg fall
+back to NV12M, which the decoder writes with Main 10 downsampled to 8 bits.
+
+--- a/libavutil/hwcontext_v4l2request.c
++++ b/libavutil/hwcontext_v4l2request.c
+@@ -393,6 +393,17 @@
+ 
+     // Next try to use the first known format with matching bit depth
+     while (ioctl(fctxi->video_fd, VIDIOC_ENUM_FMT, &fmtdesc) >= 0) {
++        /*
++         * Amlogic FBC can only be shown by the meson VPU video overlay, not
++         * by a GPU: take the linear NV12M the decoder also writes (Main 10
++         * downsampled to 8 bits) instead.
++         */
++        if (fmtdesc.pixelformat == V4L2_PIX_FMT_MESON_AM21C ||
++            fmtdesc.pixelformat == V4L2_PIX_FMT_MESON_AM21B) {
++            fmtdesc.index++;
++            continue;
++        }
++
+         for (int i = 0; i < FF_ARRAY_ELEMS(v4l2request_capture_pixelformats); i++) {
+             if (fmtdesc.pixelformat == v4l2request_capture_pixelformats[i].pixelformat) {
+                 if (fctx->bit_depth == v4l2request_capture_pixelformats[i].bit_depth ||

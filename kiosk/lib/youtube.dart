@@ -53,7 +53,9 @@ class YouTube extends ChangeNotifier {
       ...config.chromiumExtraFlags,
     ];
     debugPrint('youtube: ${config.chromium} ${args.join(' ')}');
-    final process = await Process.start(config.chromium, args);
+    // Not the player's FFmpeg/libmpv (hmp-hwdec-libs)
+    final env = Map.of(Platform.environment)..remove('LD_LIBRARY_PATH');
+    final process = await Process.start(config.chromium, args, environment: env, includeParentEnvironment: false);
     _process = process;
     _startup = Timer(_startupTime, notifyListeners);
     notifyListeners();

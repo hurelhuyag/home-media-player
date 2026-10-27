@@ -4,5 +4,5 @@ FROM debian:trixie
 
 RUN apt-get update \
  && DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
-      make dpkg-dev gcc-aarch64-linux-gnu libc6-dev-arm64-cross linux-libc-dev-arm64-cross \
+      make dpkg-dev curl ca-certificates gcc-aarch64-linux-gnu libc6-dev-arm64-cross linux-libc-dev-arm64-cross \
  && rm -rf /var/lib/apt/lists/*

@@ -3,6 +3,10 @@
 > **Multichannel PCM was solved separately** by two small module patches, see
 > `../hdmi-multichannel/`. What follows is about Dolby/DTS bitstream
 > passthrough, which still doesn't work.
+>
+> **Next step:** the LibreELEC S/PDIF→HDMI patches named below are now built
+> into the [hwdec kernel](../hwdec-kernel/README.md) (Linux 7.3); passthrough
+> with it hasn't been tested yet.
 
 Research notes from trying to get 5.1 (Dolby Digital / DD+ / DTS) out of the
 ODROID-HC4 over HDMI with the mainline kernel (Armbian 6.18). Kept so the next

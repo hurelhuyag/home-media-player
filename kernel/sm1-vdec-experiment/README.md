@@ -1,7 +1,9 @@
 # Hardware video decoding experiment (not used)
 
-The player decodes in software (`HMP_HWDEC=no`). Notes from trying hardware
-decoding on the ODROID-HC4 (Armbian, Linux 6.18.43, FFmpeg 7.1), October 2026.
+Notes from trying hardware decoding on the ODROID-HC4 with Armbian's kernel
+(Linux 6.18.43, FFmpeg 7.1), October 2026. Neither driver was usable; what
+works is LibreELEC's `amvdec` driver on Linux 7.3, see
+[`../hwdec-kernel/`](../hwdec-kernel/README.md).
 
 ## Stock decoder (`meson-vdec`, staging)
 

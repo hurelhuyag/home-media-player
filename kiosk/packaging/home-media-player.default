@@ -18,10 +18,11 @@ HMP_OUTPUT_MODE=1920x1080
 #HMP_YOUTUBE_FORCE_H264=1
 #HMP_CHROMIUM_FLAGS=
 
-# Local video playback (libmpv) decodes in software by default (~1.3 cores for
-# 1080p24 H.264). v4l2m2m-copy uses the Amlogic hardware decoder instead, but
-# its mainline driver is still experimental and can hang until a reboot.
-#HMP_HWDEC=v4l2m2m-copy
+# mpv hwdec for local videos. With hmp-hwdec-libs and the hwdec kernel it is
+# v4l2request (hardware H.264/HEVC/VP9/MPEG-2, software for the rest);
+# otherwise no (software, ~1.3 cores for 1080p24 H.264). v4l2request-copy
+# copies frames back to memory, for debugging display problems.
+#HMP_HWDEC=no
 # Extra mpv properties, name=value;name=value
 #HMP_MPV_OPTIONS="audio-device=alsa/default;sub-auto=fuzzy"
 

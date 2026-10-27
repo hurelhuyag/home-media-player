@@ -1,7 +1,8 @@
 #!/bin/bash
 # Assembles the .deb packages in dist/ from an already built kiosk bundle:
 #   cec2uinput_<v>_arm64.deb, home-media-player_<v>_arm64.deb,
-#   hmp-hdmi-multichannel-dkms_<v>_all.deb
+#   hmp-hdmi-multichannel-dkms_<v>_all.deb, hmp-hwdec-firmware_<v>_all.deb and,
+#   if hwdec-libs/build.sh ran, hmp-hwdec-libs_<v>_arm64.deb
 #
 #   CC=aarch64-linux-gnu-gcc build/package.sh      (cross, see build.sh)
 #   build/package.sh                                (on an arm64 machine / CI)
@@ -177,11 +178,15 @@ script "$PKG/DEBIAN/postinst" <<EOF
 set -e
 if [ "\$1" = configure ]; then
     dkms status -m $MOD_NAME -v $MOD_VERSION | grep -q . || dkms add -m $MOD_NAME -v $MOD_VERSION
-    if ! dkms install -m $MOD_NAME -v $MOD_VERSION -k "\$(uname -r)"; then
+    # Only for Armbian's 6.18 kernel: the hwdec kernel has these patches built in
+    if ! uname -r | grep -Eq '$(sed -n 's/^BUILD_EXCLUSIVE_KERNEL="\(.*\)"/\1/p' "$SRC/dkms.conf")'; then
+        echo "$MOD_NAME: not needed for \$(uname -r)."
+    elif dkms install -m $MOD_NAME -v $MOD_VERSION -k "\$(uname -r)"; then
+        echo "$MOD_NAME: reboot to switch HDMI audio to multichannel."
+    else
         echo "$MOD_NAME: could not build for \$(uname -r); install the matching" >&2
         echo "linux-headers package and run: dkms autoinstall" >&2
     fi
-    echo "$MOD_NAME: reboot to switch HDMI audio to multichannel."
 fi
 EOF
 script "$PKG/DEBIAN/prerm" <<EOF
@@ -190,6 +195,64 @@ set -e
 dkms remove -m $MOD_NAME -v $MOD_VERSION --all >/dev/null 2>&1 || true
 EOF
 dpkg-deb --root-owner-group -Zxz --build "$PKG" "$DIST/${MOD_NAME}-dkms_${VERSION}_all.deb"
+
+# ---- hardware decoding: FFmpeg + libmpv (hwdec-libs/build.sh) -------------------
+HWDEC_STAGE=${HWDEC_STAGE:-$ROOT/hwdec-libs/work/stage}
+if [ -d "$HWDEC_STAGE/usr" ]; then
+    echo "==> hmp-hwdec-libs $VERSION"
+    PKG="$STAGE/hmp-hwdec-libs"
+    mkdir -p "$PKG/DEBIAN"
+    cp -a "$HWDEC_STAGE/usr" "$PKG/"
+    cat > "$PKG/DEBIAN/control" <<EOF
+Package: hmp-hwdec-libs
+Version: $VERSION
+Architecture: arm64
+Maintainer: hurelhuyag <hurelhuyag@gmail.com>
+Depends: $(cat "$HWDEC_STAGE.depends")
+Recommends: hmp-hwdec-firmware
+Section: libs
+Priority: optional
+Installed-Size: $(du -sk "$PKG" | cut -f1)
+Homepage: https://github.com/hurelhuyag/home-media-player
+Description: Hardware video decoding for Home Media Player
+ FFmpeg from LibreELEC's Amlogic branch, with the V4L2 request API hwaccels,
+ and libmpv with mpv's v4l2request hwdec, in /usr/lib/home-media-player/hwdec.
+ The player uses them instead of Debian's FFmpeg and libmpv. Needs a kernel
+ with the Amlogic stateless decoder (amvdec).
+EOF
+    dpkg-deb --root-owner-group -Zxz --build "$PKG" "$DIST/hmp-hwdec-libs_${VERSION}_arm64.deb"
+else
+    echo "==> hmp-hwdec-libs skipped (no $HWDEC_STAGE, run hwdec-libs/build.sh)"
+fi
+
+# ---- decoder firmware (LibreELEC/meson-firmware) ----------------------------------
+FW_COMMIT=662b843714ac18e92b19887fadc8d8b3d94fc814
+FW_SHA256=671abbb5baa073bd857560a76feb62ffffe94e75774f6c13d7a0872ee4563b16
+echo "==> hmp-hwdec-firmware $VERSION"
+PKG="$STAGE/hmp-hwdec-firmware"
+mkdir -p "$PKG/DEBIAN" "$STAGE/fw"
+curl -fsSL --retry 3 -o "$STAGE/fw.tar.gz" "https://github.com/LibreELEC/meson-firmware/archive/$FW_COMMIT.tar.gz"
+echo "$FW_SHA256  $STAGE/fw.tar.gz" | sha256sum -c --quiet
+tar -C "$STAGE/fw" --strip-components=1 -xzf "$STAGE/fw.tar.gz"
+# updates/ is searched first, and keeps clear of linux-firmware's older files
+# with the same names
+FW="$PKG/lib/firmware/updates/meson/vdec"
+mkdir -p "$FW"
+cp "$STAGE"/fw/meson/vdec/{g12a,sm1}_*.bin "$STAGE"/fw/meson/vdec/gxl_mpeg12_multi.bin "$FW/"
+install -Dm644 "$STAGE/fw/LICENSE" "$PKG/usr/share/doc/hmp-hwdec-firmware/copyright"
+cat > "$PKG/DEBIAN/control" <<EOF
+Package: hmp-hwdec-firmware
+Version: $VERSION
+Architecture: all
+Maintainer: hurelhuyag <hurelhuyag@gmail.com>
+Section: non-free-firmware/kernel
+Priority: optional
+Homepage: https://github.com/LibreELEC/meson-firmware
+Description: Amlogic G12/SM1 video decoder firmware for the amvdec driver
+ AMRISC microcode from LibreELEC's meson-firmware, for the stateless decoder
+ driver (amvdec) in the home-media-player hwdec kernel.
+EOF
+dpkg-deb --root-owner-group -Zxz --build "$PKG" "$DIST/hmp-hwdec-firmware_${VERSION}_all.deb"
 
 rm -rf "$STAGE"
 ls -lh "$DIST"/*.deb

@@ -38,11 +38,17 @@ class Config {
   List<String> get chromiumExtraFlags =>
       _str('HMP_CHROMIUM_FLAGS', '').split(' ').where((s) => s.isNotEmpty).toList();
 
-  /// mpv hwdec value. Software decoding by default: the Amlogic V4L2 decoder
-  /// (`v4l2m2m-copy`, staging driver meson_vdec) saves CPU but can hang inside
-  /// the kernel and freeze the player until a reboot. Zero-copy `v4l2m2m`
-  /// doesn't work with media_kit's GL renderer at all.
-  String get hwdec => _str('HMP_HWDEC', 'no');
+  /// mpv hwdec value. With hmp-hwdec-libs on the library path (see the
+  /// session script) the default is `v4l2request`: the Amlogic decoder through
+  /// the V4L2 request API (needs the hwdec kernel); mpv falls back to software
+  /// for codecs or kernels it can't handle. Otherwise software decoding: the
+  /// stock staging decoder (`v4l2m2m-copy`) can hang inside the kernel.
+  String get hwdec => _str('HMP_HWDEC', hwdecLibs ? 'v4l2request' : 'no');
+
+  /// Whether the player runs on hmp-hwdec-libs' libmpv instead of Debian's.
+  bool get hwdecLibs => (_env['LD_LIBRARY_PATH'] ?? '').split(':').contains(hwdecLibDir);
+
+  static const hwdecLibDir = '/usr/lib/home-media-player/hwdec/lib';
 
   /// mpv.conf, input.conf and scripts/ for the player, like ~/.config/mpv.
   String get mpvConfigDir => _str('HMP_MPV_CONFIG_DIR', '/etc/home-media-player/mpv');

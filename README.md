@@ -8,6 +8,9 @@ HDMI and is driven with the **TV's own remote** over HDMI-CEC:
   hotkeys and your own `input.conf`), view photos with a slideshow.
 - **Power** – restart or shut down.
 - **5.1 sound** – multichannel PCM to your TV or AV receiver.
+- **Hardware video decoding** (optional, needs a custom kernel) – H.264 and
+  HEVC (also 10-bit) on the Amlogic decoder, see
+  [Hardware video decoding](#hardware-video-decoding).
 
 It is the successor of [cec2media](https://github.com/hurelhuyag/cec2media)
 (Raspberry Pi).
@@ -110,6 +113,30 @@ Disks: internal SATA disks and USB drives are listed under Media and mounted
 when opened. To mount a disk at boot instead, add it to `/etc/fstab` (use
 `nofail`) and it shows up there as well.
 
+## Hardware video decoding
+
+By default videos decode in software: 1080p H.264 takes about 1.3 CPU cores
+and 1080p HEVC 10-bit barely keeps up (~27 fps). The stock kernel's
+decoder driver isn't usable (it hangs inside the kernel).
+
+LibreELEC's Amlogic decoder driver works. It needs three things, none of them
+installed by `install.sh` yet:
+
+- Armbian's edge kernel (Linux 7.3) built with LibreELEC's patches:
+  [kernel/hwdec-kernel](kernel/hwdec-kernel/README.md), which also has the
+  install and rollback steps
+- `hmp-hwdec-firmware`: the decoder microcode
+- `hmp-hwdec-libs`: FFmpeg and libmpv with the V4L2 request API, see
+  [hwdec-libs](hwdec-libs/README.md)
+
+With them the player uses the hardware decoder (`hwdec=v4l2request`) for
+H.264, HEVC (8- and 10-bit), VP9 and MPEG-2 (the last two not tested yet),
+and software for everything else. A 10 s 1080p H.264 clip then takes 1.75 s
+of CPU instead of 26.8 s. Starting, seeking and reaching the end of files all
+work reliably. The same kernel carries LibreELEC's HDMI audio patches, which
+replace `hmp-hdmi-multichannel-dkms` and may make Dolby/DTS passthrough
+possible; audio on this kernel isn't tested yet.
+
 ## Configuration
 
 | File | What |
@@ -137,16 +164,23 @@ Apply changes with `systemctl restart home-media-player` (or
   install the matching `linux-headers-current-meson64` and run
   `dkms autoinstall`. `hdmi-channel-test` (in `tools/`) plays noise on chosen
   channels to check speaker wiring.
-- **Dolby/DTS passthrough** isn't possible yet with the mainline kernel; mpv
+- **Dolby/DTS passthrough** isn't possible with Armbian's kernel; mpv
   decodes those formats to multichannel PCM instead. See
-  [kernel/passthrough-research](kernel/passthrough-research/README.md).
+  [kernel/passthrough-research](kernel/passthrough-research/README.md). The
+  [hwdec kernel](kernel/hwdec-kernel/README.md) has the patches it needs
+  (not tested yet).
+- **Video plays but the picture is blue or green** (hwdec kernel): set
+  `HMP_HWDEC=v4l2request-copy` or `no` in `/etc/default/home-media-player`,
+  and report the file's codec (`ffprobe FILE`). 10-bit HEVC did this before
+  `hwdec-libs/ffmpeg-no-amlogic-fbc.patch`.
 - **SATA disk missing**: `pcie_aspm=off` must be on the kernel command line
   (`cat /proc/cmdline`).
 
 ## Uninstall
 
 ```sh
-sudo apt purge home-media-player cec2uinput hmp-hdmi-multichannel-dkms
+sudo apt purge home-media-player cec2uinput hmp-hdmi-multichannel-dkms \
+    hmp-hwdec-libs hmp-hwdec-firmware     # the last two only if installed
 sudo cp /boot/armbianEnv.txt.before-home-media-player /boot/armbianEnv.txt
 sudo systemctl set-default multi-user.target
 ```
@@ -159,11 +193,15 @@ sudo systemctl set-default multi-user.target
 | `cec2uinput/` | C daemon: registers on the CEC bus and turns remote presses into keys of a virtual keyboard (uinput); uses `/dev/cec0` directly, no libcec |
 | `kernel/hdmi-multichannel/` | DKMS package with the patched sound modules for 5.1 over HDMI |
 | `kernel/passthrough-research/` | notes and code from the passthrough attempt |
+| `kernel/hwdec-kernel/` | Armbian edge kernel with LibreELEC's decoder and HDMI audio patches |
+| `kernel/sm1-vdec-experiment/` | notes from the hardware decoders that didn't work |
+| `hwdec-libs/` | FFmpeg and libmpv with the V4L2 request API (`hmp-hwdec-libs`) |
 | `build/` | packaging and local build scripts |
 | `tools/` | `hdmi-channel-test` |
 
 **Releases** are built by GitHub Actions on arm64 runners: push a tag and the
-workflow publishes the packages and `install.sh` as a release.
+workflow publishes the packages and `install.sh` as a release. The kernel and
+`hmp-hwdec-libs` aren't built there yet, only locally.
 
 ```sh
 git tag v0.1.1 && git push origin v0.1.1

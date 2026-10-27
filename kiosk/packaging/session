@@ -15,4 +15,12 @@ unset XCURSOR_PATH
 export XCURSOR_THEME=Adwaita XCURSOR_SIZE=32
 
 export GDK_BACKEND=wayland
+
+# hmp-hwdec-libs: FFmpeg with the V4L2 request API and a libmpv built on it,
+# used by the player instead of Debian's (Chromium drops it again)
+HWDEC_LIBS=/usr/lib/home-media-player/hwdec/lib
+if [ -e "$HWDEC_LIBS/libmpv.so.2" ]; then
+    export LD_LIBRARY_PATH="$HWDEC_LIBS${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}"
+fi
+
 exec /opt/home-media-player/home_media_player "$@"

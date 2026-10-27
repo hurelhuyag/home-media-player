@@ -1,0 +1,73 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: Christian Hewitt <christianshewitt@gmail.com>
+Date: Tue, 15 Sep 2026 01:09:15 +0000
+Subject: [PATCH] arm64: dts: meson: g12: carry HDMI audio from the SPDIF
+ encoder
+
+The G12 boards route HDMI audio through the I2S leg of the HDMI TX glue,
+which carries linear PCM only. Wire the S/PDIF leg as well so compressed
+streams can be sent over HDMI.
+
+Boards with an optical output already drive it from spdifout_a and have
+spdifout_b on the glue, and only need the link from the glue's S/PDIF
+output to the transmitter. Give the other boards spdifout_b, so the
+mixer settings are the same across the family.
+
+Assisted-by: Claude:claude-opus-5
+Signed-off-by: Christian Hewitt <christianshewitt@gmail.com>
+---
+ .../boot/dts/amlogic/meson-sm1-odroid.dtsi    | 27 ++++++++++++++++++-
+ 1 file changed, 26 insertions(+), 1 deletion(-)
+
+diff --git a/arch/arm64/boot/dts/amlogic/meson-sm1-odroid.dtsi b/arch/arm64/boot/dts/amlogic/meson-sm1-odroid.dtsi
+index fb48be6f8..667f503df 100644
+--- a/arch/arm64/boot/dts/amlogic/meson-sm1-odroid.dtsi
++++ b/arch/arm64/boot/dts/amlogic/meson-sm1-odroid.dtsi
+@@ -187,7 +187,10 @@ sound {
+ 		audio-routing = "TDMOUT_B IN 0", "FRDDR_A OUT 1",
+ 				"TDMOUT_B IN 1", "FRDDR_B OUT 1",
+ 				"TDMOUT_B IN 2", "FRDDR_C OUT 1",
+-				"TDM_B Playback", "TDMOUT_B OUT";
++				"TDM_B Playback", "TDMOUT_B OUT",
++				"SPDIFOUT_B IN 0", "FRDDR_A OUT 4",
++				"SPDIFOUT_B IN 1", "FRDDR_B OUT 4",
++				"SPDIFOUT_B IN 2", "FRDDR_C OUT 4";
+ 
+ 		clocks = <&clkc CLKID_MPLL2>,
+ 			 <&clkc CLKID_MPLL0>,
+@@ -235,6 +238,24 @@ codec {
+ 				sound-dai = <&hdmi_tx 0>;
+ 			};
+ 		};
++
++		/* spdif hdmi interface */
++		dai-link-5 {
++			sound-dai = <&spdifout_b>;
++
++			codec {
++				sound-dai = <&tohdmitx TOHDMITX_SPDIF_IN_B>;
++			};
++		};
++
++		/* hdmi glue, compressed */
++		dai-link-6 {
++			sound-dai = <&tohdmitx TOHDMITX_SPDIF_OUT>;
++
++			codec {
++				sound-dai = <&hdmi_tx 1>;
++			};
++		};
+ 	};
+ };
+ 
+@@ -442,6 +463,10 @@ &sd_emmc_c {
+ 	vqmmc-supply = <&flash_1v8>;
+ };
+ 
++&spdifout_b {
++	status = "okay";
++};
++
+ &tdmif_b {
+ 	status = "okay";
+ };
