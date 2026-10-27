@@ -74,12 +74,18 @@ if [ "$HC4" = 1 ] && [ -f "$ARMBIAN_ENV" ]; then
     grep '^extraargs=' "$ARMBIAN_ENV"
 
     # Stock CPU speed: the device tree also offers 2.016/2.1 GHz overclock
-    # steps, suspected of causing random crashes (compilers, video decoding)
-    printf '%s\n' \
-        "# ODROID-HC4: stay at the S905X3 stock 1.908 GHz (home-media-player)" \
-        "w /sys/devices/system/cpu/cpufreq/policy0/scaling_max_freq - - - - 1908000" \
-        > /etc/tmpfiles.d/hc4-cpufreq.conf
-    systemd-tmpfiles --create /etc/tmpfiles.d/hc4-cpufreq.conf || true
+    # steps, suspected of causing random crashes (compilers, video decoding).
+    # armbian-hardware-optimize applies MAX_SPEED from this file at every boot
+    # (whatever its ENABLE says).
+    if [ -f /etc/default/cpufrequtils ]; then
+        sed -i 's/^MAX_SPEED=.*/MAX_SPEED=1908000/' /etc/default/cpufrequtils
+        grep -q '^MAX_SPEED=' /etc/default/cpufrequtils || echo 'MAX_SPEED=1908000' >> /etc/default/cpufrequtils
+    else
+        printf 'ENABLE=false\nMAX_SPEED=1908000\n' > /etc/default/cpufrequtils
+    fi
+    for policy in /sys/devices/system/cpu/cpufreq/policy*; do
+        echo 1908000 > "$policy/scaling_max_freq" 2>/dev/null || true
+    done
 fi
 
 # ---- packages -----------------------------------------------------------------

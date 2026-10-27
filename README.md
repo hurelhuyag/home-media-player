@@ -69,7 +69,7 @@ The installer:
 
 - sets kernel options in `/boot/armbianEnv.txt`: 1080p HDMI, and
   `pcie_aspm=off` so the SATA controller works
-- keeps the CPU at its stock 1.908 GHz (`/etc/tmpfiles.d/hc4-cpufreq.conf`);
+- keeps the CPU at its stock 1.908 GHz (`MAX_SPEED` in `/etc/default/cpufrequtils`);
   the 2.0/2.1 GHz overclock steps Armbian allows were unstable on our board
 - installs the packages from the latest release and their dependencies
   (Chromium, cage, mpv, …)

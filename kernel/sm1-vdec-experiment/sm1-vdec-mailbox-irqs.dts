@@ -1,0 +1,22 @@
+/*
+ * Gives the SM1/G12 video decoder the mailbox interrupts the meson-sm1-codecs
+ * decoder (github.com/ray38080289/meson-sm1-codecs) needs: its multi-instance
+ * HEVC firmware signals mailbox 0, which mainline's device tree leaves out.
+ * Same list as unifreq's linux-6.18.y meson-g12-common.dtsi. The stock
+ * meson-vdec only looks up "vdec" and "esparser" and ignores the rest.
+ *
+ *   armbian-add-overlay sm1-vdec-mailbox-irqs.dts && reboot
+ */
+/dts-v1/;
+/plugin/;
+
+/ {
+	fragment@0 {
+		target-path = "/soc/video-decoder@ff620000";
+		__overlay__ {
+			/* GIC SPI, rising edge */
+			interrupts = <0 32 1>, <0 43 1>, <0 44 1>, <0 45 1>;
+			interrupt-names = "esparser", "mbox0", "vdec", "mbox2";
+		};
+	};
+};
