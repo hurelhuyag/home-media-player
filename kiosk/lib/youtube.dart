@@ -36,6 +36,10 @@ class YouTube extends ChangeNotifier {
       '--app=${config.youtubeUrl}',
       '--user-agent=${config.youtubeUserAgent}',
       '--user-data-dir=${config.dataDir}/youtube-profile',
+      // The HTTP and code caches are rewritten all the time while watching:
+      // in RAM (tmpfs), not on the SD card; the profile (sign-in) stays
+      '--disk-cache-dir=/tmp/home-media-player/chromium-cache',
+      '--disk-cache-size=${100 << 20}',
       '--load-extension=$extensionDir',
       // Chromium 137+ ignores --load-extension unless this feature is off.
       // HardwareMediaKeyHandling: media keys go to the page (page.js) instead
