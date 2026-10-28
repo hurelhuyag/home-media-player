@@ -103,6 +103,14 @@ The driver also writes linear `NV12M` for 10-bit streams, downsampled to
 8 bits by the decoder; `hwdec-libs/ffmpeg-no-amlogic-fbc.patch` makes FFmpeg
 take that. Nothing is lost on an 8-bit SDR TV.
 
+**Widths whose rows aren't 64-byte aligned**: the decoder pads HEVC and VP9
+rows to 32 bytes, Panfrost only imports frames with rows padded to 64
+(`panfrost: rejecting image due to unsupported offset or stride alignment`
+and a blue picture). 1280 and 1920 are fine; a 720x302 HEVC file wasn't. The
+player switches such videos to `v4l2request-copy` (hardware decoding, frames
+copied to memory), see `_checkHwdec` in `kiosk/lib/screens/player_screen.dart`.
+H.264 rows are padded to 64 and not affected.
+
 Known messages, harmless: `meson-drm: User-defined mode not supported:
 "1920x1080i"` (the TV lists an interlaced mode) and `axg-tdm-iface: ASoC:
 Failed to prepare bias: -5` at audio start.

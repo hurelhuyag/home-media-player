@@ -2,9 +2,11 @@ import 'dart:io';
 
 import 'package:flutter/material.dart';
 
+import '../standby.dart';
 import '../widgets.dart';
 import '../youtube.dart';
 import 'disks_screen.dart';
+import 'internet_tv_screen.dart';
 
 class LauncherScreen extends StatelessWidget {
   const LauncherScreen({super.key});
@@ -33,6 +35,13 @@ class LauncherScreen extends StatelessWidget {
                       title: 'Media',
                       onSelect: () => Navigator.of(context).push(
                         MaterialPageRoute(builder: (_) => const DisksScreen()),
+                      ),
+                    ),
+                    _LauncherTile(
+                      icon: Icons.live_tv,
+                      title: 'Internet TV',
+                      onSelect: () => Navigator.of(context).push(
+                        MaterialPageRoute(builder: (_) => const InternetTvScreen()),
                       ),
                     ),
                     _LauncherTile(
@@ -75,12 +84,24 @@ class LauncherScreen extends StatelessWidget {
         title: const Text('Power'),
         children: [
           SimpleDialogOption(
+            onPressed: () => Navigator.pop(context, 'standby'),
+            child: const ListTile(
+              leading: Icon(Icons.bedtime),
+              title: Text('Standby'),
+              subtitle: Text('Screen off; the TV remote wakes it'),
+            ),
+          ),
+          SimpleDialogOption(
             onPressed: () => Navigator.pop(context, 'reboot'),
             child: const ListTile(leading: Icon(Icons.restart_alt), title: Text('Restart')),
           ),
           SimpleDialogOption(
             onPressed: () => Navigator.pop(context, 'poweroff'),
-            child: const ListTile(leading: Icon(Icons.power_settings_new), title: Text('Shut down')),
+            child: const ListTile(
+              leading: Icon(Icons.power_settings_new),
+              title: Text('Shut down'),
+              subtitle: Text('Starts again only by replugging the power'),
+            ),
           ),
           SimpleDialogOption(
             onPressed: () => Navigator.pop(context),
@@ -90,6 +111,10 @@ class LauncherScreen extends StatelessWidget {
       ),
     );
     if (action == null) return;
+    if (action == 'standby') {
+      await Standby.instance.enter();
+      return;
+    }
     // logind lets the user of the active seat session do this without a password
     final result = await Process.run('systemctl', [action]);
     if (result.exitCode != 0 && context.mounted) {

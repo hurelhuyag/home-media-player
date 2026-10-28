@@ -16,4 +16,5 @@ RUN dpkg --add-architecture arm64 \
       libass-dev:arm64 libplacebo-dev:arm64 libluajit-5.1-dev:arm64 libasound2-dev:arm64 \
       libegl-dev:arm64 libgbm-dev:arm64 libuchardet-dev:arm64 libjpeg-dev:arm64 \
       libarchive-dev:arm64 liblcms2-dev:arm64 libzimg-dev:arm64 libdisplay-info-dev:arm64 \
+      libxml2-dev:arm64 \
  && rm -rf /var/lib/apt/lists/*

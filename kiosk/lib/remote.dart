@@ -14,11 +14,17 @@ abstract final class RemoteKeys {
   static bool isBack(LogicalKeyboardKey k) =>
       k == LogicalKeyboardKey.escape || k == LogicalKeyboardKey.goBack || k == LogicalKeyboardKey.browserBack;
 
+  /// The remote's play/pause button. Not mediaPlay/mediaPause: cec2uinput
+  /// sends those when the TV switches away from or back to the box
+  /// ([isSourceLost], [isSourceBack]).
   static bool isPlayPause(LogicalKeyboardKey k) =>
-      k == LogicalKeyboardKey.mediaPlayPause ||
-      k == LogicalKeyboardKey.mediaPlay ||
-      k == LogicalKeyboardKey.mediaPause ||
-      k == LogicalKeyboardKey.space;
+      k == LogicalKeyboardKey.mediaPlayPause || k == LogicalKeyboardKey.space;
+
+  /// The TV switched to its tuner or another input (cec2uinput KEY_PAUSECD).
+  static bool isSourceLost(LogicalKeyboardKey k) => k == LogicalKeyboardKey.mediaPause;
+
+  /// The TV switched back to the box (cec2uinput KEY_PLAYCD).
+  static bool isSourceBack(LogicalKeyboardKey k) => k == LogicalKeyboardKey.mediaPlay;
 
   static bool isStop(LogicalKeyboardKey k) => k == LogicalKeyboardKey.mediaStop;
 
@@ -36,18 +42,23 @@ abstract final class RemoteKeys {
 
 }
 
-/// Reads the cec2uinput evdev device directly to catch the remote's HOME key
-/// even while another Wayland client (Chromium) has keyboard focus.
+/// Reads the cec2uinput evdev device directly to see remote keys and TV
+/// events even while another Wayland client (Chromium) has keyboard focus.
 /// Needs the kiosk user to be in the `input` group.
 class GlobalRemoteListener {
-  GlobalRemoteListener({required this.deviceName, required this.onHome});
+  GlobalRemoteListener({required this.deviceName, required this.onKeyDown});
+
+  /// Linux key codes (input-event-codes.h)
+  static const keyHome = 102;
+  static const keyPlayCd = 200; // cec2uinput: the TV switched back to us
+  static const keyPauseCd = 201; // cec2uinput: the TV switched away
+  static const keyScreenSaver = 0x245; // cec2uinput: the TV turned off
 
   static const _evKey = 1;
-  static const _keyHome = 102;
   static const _eventSize = 24; // struct input_event on 64-bit
 
   final String deviceName;
-  final VoidCallback onHome;
+  final void Function(int code) onKeyDown;
   bool _stopped = false;
 
   void start() => unawaited(_run());
@@ -77,7 +88,7 @@ class GlobalRemoteListener {
             final type = data.getUint16(off + 16, Endian.little);
             final code = data.getUint16(off + 18, Endian.little);
             final value = data.getInt32(off + 20, Endian.little);
-            if (type == _evKey && code == _keyHome && value == 1) onHome();
+            if (type == _evKey && value == 1) onKeyDown(code);
           }
         }
       } catch (e) {

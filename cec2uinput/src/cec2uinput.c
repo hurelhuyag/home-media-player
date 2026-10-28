@@ -39,6 +39,17 @@
  * so we try again ourselves. */
 #define CLAIM_RETRY_MS 10000
 
+/*
+ * Keys for what the TV does, so the kiosk can react without a CEC library:
+ * pause when the TV switches to another source, resume when it switches back
+ * to us, standby when it turns off. The remote's own play/pause button is
+ * KEY_PLAYPAUSE, so these never collide with it. Not KEY_SLEEP or KEY_POWER:
+ * udev tags us as a "power-switch" and logind would suspend or power off.
+ */
+#define KEY_SOURCE_LOST KEY_PAUSECD
+#define KEY_SOURCE_BACK KEY_PLAYCD
+#define KEY_TV_STANDBY KEY_SCREENSAVER
+
 static const char *opt_device = "/dev/cec0";
 static const char *opt_osd_name = "YoutubeTV";
 static int opt_type = CEC_LOG_ADDR_TYPE_RECORD;
@@ -169,6 +180,15 @@ static void key_release(void)
 	held_key = -1;
 }
 
+/* A press and release of its own, for bus events */
+static void key_tap(int code)
+{
+	key_release();
+	debug("key %d tap", code);
+	key_event(code, 1);
+	key_event(code, 0);
+}
+
 static void key_press(int code)
 {
 	held_since_ms = now_ms();
@@ -199,6 +219,7 @@ static int uinput_open(void)
 	for (size_t i = 0; i < sizeof(keymap) / sizeof(keymap[0]); i++)
 		if (keymap[i])
 			ioctl(fd, UI_SET_KEYBIT, keymap[i]);
+	ioctl(fd, UI_SET_KEYBIT, KEY_TV_STANDBY);
 	if (ioctl(fd, UI_DEV_SETUP, &setup) < 0 || ioctl(fd, UI_DEV_CREATE) < 0) {
 		info("create uinput device: %s", strerror(errno));
 		close(fd);
@@ -234,6 +255,53 @@ static void become_active_source(void)
 	cec_msg_init(&msg, our_la, CEC_LOG_ADDR_BROADCAST);
 	cec_msg_active_source(&msg, our_pa);
 	cec_send(&msg);
+}
+
+/* The TV (or a switch) routed its input to us */
+static void source_back(void)
+{
+	bool was_active = active_source;
+
+	become_active_source();
+	if (!was_active && active_source) {
+		info("TV switched to us");
+		key_tap(KEY_SOURCE_BACK);
+	}
+}
+
+/* The TV switched to its tuner or another device */
+static void source_lost(void)
+{
+	if (!active_source)
+		return;
+	active_source = false;
+	info("TV switched to another source");
+	key_tap(KEY_SOURCE_LOST);
+}
+
+/*
+ * Whether pa is a switch between the TV and us (the AV receiver): the TV
+ * routes to it first and the switch then reports which of its inputs is
+ * active. The TV itself (0.0.0.0) is excluded, it means its own tuner.
+ */
+static bool is_our_switch(uint16_t pa)
+{
+	for (int shift = 12; shift > 0; shift -= 4) {
+		uint16_t mask = 0xffff << shift;
+
+		if (!(pa & ~mask) && (pa & mask) && pa == (our_pa & mask) && pa != our_pa)
+			return true;
+	}
+	return false;
+}
+
+/* The TV's input now leads to pa (Routing Change / Routing Information) */
+static void route_to(uint16_t pa)
+{
+	if (pa == our_pa)
+		source_back();
+	else if (!is_our_switch(pa))
+		source_lost();
 }
 
 static void one_touch_play(void)
@@ -347,7 +415,7 @@ static void handle_message(struct cec_msg *msg)
 	struct cec_msg reply;
 	bool directed = !cec_msg_is_broadcast(msg);
 	uint8_t from = cec_msg_initiator(msg);
-	uint16_t pa;
+	uint16_t pa, orig_pa;
 
 	if (msg->len < 2)
 		return; /* poll */
@@ -395,19 +463,29 @@ static void handle_message(struct cec_msg *msg)
 
 	case CEC_MSG_SET_STREAM_PATH:
 		cec_ops_set_stream_path(msg, &pa);
-		if (pa == our_pa)
-			become_active_source();
+		route_to(pa);
+		break;
+
+	case CEC_MSG_ROUTING_CHANGE:
+		cec_ops_routing_change(msg, &orig_pa, &pa);
+		route_to(pa);
+		break;
+
+	case CEC_MSG_ROUTING_INFORMATION:
+		cec_ops_routing_information(msg, &pa);
+		route_to(pa);
 		break;
 
 	case CEC_MSG_ACTIVE_SOURCE:
 		cec_ops_active_source(msg, &pa);
 		if (pa != our_pa)
-			active_source = false;
+			source_lost();
 		break;
 
 	case CEC_MSG_STANDBY:
-		active_source = false;
-		key_release();
+		info("TV standby");
+		source_lost();
+		key_tap(KEY_TV_STANDBY);
 		break;
 
 	case CEC_MSG_FEATURE_ABORT:

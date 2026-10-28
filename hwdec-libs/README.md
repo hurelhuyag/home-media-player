@@ -10,7 +10,8 @@ through them. `build.sh` builds, into the private prefix
 | FFmpeg | LibreELEC's Amlogic branch, [chewitt/ffmpeg](https://github.com/chewitt/ffmpeg) `c04518b` (what LibreELEC ships) | `ffmpeg-no-amlogic-fbc.patch` |
 | libmpv (+ `mpv` for tests) | 0.41.0 | `mpv-v4l2request.patch`: mpv [PR #14690](https://github.com/mpv-player/mpv/pull/14690), the `v4l2request` hwdec |
 
-FFmpeg also needs Linux 7.3's V4L2 headers (HEVC `EXT_SPS` controls that
+FFmpeg is built with libxml2 for DASH (`.mpd`), which most Internet TV
+channels use. FFmpeg also needs Linux 7.3's V4L2 headers (HEVC `EXT_SPS` controls that
 Debian 13's 6.12 headers lack); the script fetches them from git.kernel.org,
 checksummed. All downloads are pinned by SHA-256.
 
@@ -49,6 +50,11 @@ $B/mpv --hwdec=v4l2request-copy --vo=null --frames=300 FILE   # "Using hardware 
 
 `--vo=gpu --gpu-context=drm` needs a connected display: with the TV off HDMI
 reports disconnected and mpv finds "no usable DRM primary node".
+
+Zero-copy frames go to the GPU as dmabufs with the decoder's row pitch; for
+HEVC/VP9 widths whose 32-byte padded rows aren't a multiple of 64 bytes,
+Panfrost refuses them and the player copies instead (see
+[the kernel notes](../kernel/hwdec-kernel/README.md#results-odroid-hc4-october-2026)).
 
 ## ffmpeg-no-amlogic-fbc.patch
 

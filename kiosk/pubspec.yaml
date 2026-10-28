@@ -1,7 +1,7 @@
 name: home_media_player
 description: "TV kiosk: YouTube TV, local videos and photos, driven by the TV remote"
 publish_to: 'none'
-version: 0.1.0+1
+version: 0.2.0+2
 
 environment:
   sdk: ^3.13.1

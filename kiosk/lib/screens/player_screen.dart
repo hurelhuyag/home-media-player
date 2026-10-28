@@ -11,17 +11,33 @@ import '../config.dart';
 import '../media.dart';
 import '../remote.dart';
 
-/// Plays local videos and music with libmpv inside the kiosk process.
+/// Something the player can play: a local file or a stream.
+class PlayItem {
+  const PlayItem({required this.uri, required this.title, this.audio = false, this.httpHeaders});
+
+  PlayItem.file(File file) : this(uri: file.path, title: p.basename(file.path), audio: kindOf(file) == MediaKind.audio);
+
+  final String uri;
+  final String title;
+  final bool audio;
+  final Map<String, String>? httpHeaders;
+}
+
+/// Plays local videos and music, and live TV streams, with libmpv inside the
+/// kiosk process.
 ///
 /// It behaves like the mpv program: keys go to mpv, so its default bindings
 /// and the user's input.conf apply, and mpv draws its own OSD/OSC. Only
 /// closing the player stays with the app, since mpv's `quit` would shut down
 /// the embedded player instead.
 class PlayerScreen extends StatefulWidget {
-  const PlayerScreen({super.key, required this.playlist, required this.index});
+  const PlayerScreen({super.key, required this.playlist, required this.index, this.live = false});
 
-  final List<File> playlist;
+  final List<PlayItem> playlist;
   final int index;
+
+  /// Live TV: no resume positions, channel up/down switch channels.
+  final bool live;
 
   @override
   State<PlayerScreen> createState() => _PlayerScreenState();
@@ -44,6 +60,11 @@ class _PlayerScreenState extends State<PlayerScreen> {
   /// is the only time mpv saves by itself.
   static const _saveInterval = Duration(seconds: 30);
   String? _error;
+  bool _hwdecCopy = false;
+
+  /// Paused because the TV switched to another source, so switching back
+  /// resumes it (but not a video the user paused).
+  bool _pausedForTv = false;
 
   NativePlayer get _mpv => _player.platform as NativePlayer;
 
@@ -52,11 +73,20 @@ class _PlayerScreenState extends State<PlayerScreen> {
     super.initState();
     _subscriptions
       ..add(_player.stream.playlist.listen((pl) {
-        if (mounted && pl.index != _index) setState(() => _index = pl.index);
+        // Live TV opens one channel at a time (_tune)
+        if (widget.live || pl.index == _index) return;
+        _restoreHwdec();
+        if (mounted) {
+          setState(() {
+            _index = pl.index;
+            _error = null;
+          });
+        }
       }))
+      ..add(_player.stream.videoParams.listen(_checkHwdec))
       ..add(_player.stream.completed.listen((done) {
         // Last file finished: back to the list
-        if (done && _index == widget.playlist.length - 1 && mounted) Navigator.of(context).maybePop();
+        if (done && !widget.live && _index == widget.playlist.length - 1 && mounted) Navigator.of(context).maybePop();
       }))
       ..add(_player.stream.error.listen((e) {
         if (mounted) setState(() => _error = e);
@@ -89,13 +119,68 @@ class _PlayerScreenState extends State<PlayerScreen> {
     for (final o in config.mpvOptions.entries) {
       await _mpv.setProperty(o.key, o.value);
     }
+    if (widget.live) {
+      // A live stream has no position to come back to
+      await _mpv.setProperty('resume-playback', 'no');
+      await _mpv.setProperty('save-position-on-quit', 'no');
+    }
     _saveTimer = Timer.periodic(_saveInterval, (_) {
       if (_player.state.playing) _savePosition(_mpv);
     });
-    await _player.open(Playlist(
-      [for (final f in widget.playlist) Media(f.path)],
-      index: widget.index,
-    ));
+    if (widget.live) {
+      await _tune(widget.index);
+    } else {
+      await _player.open(Playlist(
+        [for (final item in widget.playlist) Media(item.uri, httpHeaders: item.httpHeaders)],
+        index: widget.index,
+      ));
+    }
+  }
+
+  /// Live TV: opens one channel at a time. In an mpv playlist a channel that
+  /// fails to open is skipped, so every broken channel would show the next
+  /// working one; this way its error shows instead.
+  Future<void> _tune(int index) async {
+    index %= widget.playlist.length;
+    final item = widget.playlist[index];
+    _restoreHwdec();
+    if (mounted) {
+      setState(() {
+        _index = index;
+        _error = null;
+      });
+    }
+    await _player.open(Media(item.uri, httpHeaders: item.httpHeaders));
+    // Streams have no useful title of their own: the channel name goes on
+    // screen and in the OSC
+    await _mpv.setProperty('force-media-title', item.title);
+    await _mpv.command(['show-text', item.title, '3000']);
+  }
+
+  /// The Amlogic decoder pads HEVC and VP9 rows to 32 bytes, but Panfrost
+  /// only imports frames whose rows are a multiple of 64 bytes ("rejecting
+  /// image due to unsupported offset or stride alignment" and a blue picture),
+  /// e.g. 720 wide. Those videos get their frames copied instead.
+  Future<void> _checkHwdec(VideoParams params) async {
+    final w = params.w ?? 0;
+    if (w == 0 || (w + 31) ~/ 32 % 2 == 0) return;
+    try {
+      if (await _mpv.getProperty('hwdec-current') != 'v4l2request') return;
+      final codec = await _mpv.getProperty('current-tracks/video/codec');
+      if (codec != 'hevc' && codec != 'vp9') return;
+      debugPrint('player: $codec ${w}px wide, rows not 64-byte aligned: v4l2request-copy');
+      _hwdecCopy = true;
+      await _mpv.setProperty('hwdec', 'v4l2request-copy');
+    } catch (e) {
+      debugPrint('player: hwdec check failed: $e');
+    }
+  }
+
+  /// Back to the configured hwdec for the next file.
+  void _restoreHwdec() {
+    if (!_hwdecCopy) return;
+    _hwdecCopy = false;
+    unawaited(_mpv.setProperty('hwdec', Config.instance.hwdec));
   }
 
   @override
@@ -141,6 +226,25 @@ class _PlayerScreenState extends State<PlayerScreen> {
       if (event is KeyDownEvent) Navigator.of(context).maybePop();
       return KeyEventResult.handled;
     }
+    if (widget.live && (RemoteKeys.isNext(k) || RemoteKeys.isPrevious(k))) {
+      // Channel up/down (and skip) on the remote
+      if (event is! KeyUpEvent) _tune(_index + (k == LogicalKeyboardKey.pageUp || k == LogicalKeyboardKey.mediaTrackNext ? 1 : -1));
+      return KeyEventResult.handled;
+    }
+    if (RemoteKeys.isSourceLost(k)) {
+      if (event is KeyDownEvent && _player.state.playing) {
+        _pausedForTv = true;
+        _player.pause();
+      }
+      return KeyEventResult.handled;
+    }
+    if (RemoteKeys.isSourceBack(k)) {
+      if (event is KeyDownEvent && _pausedForTv) {
+        _pausedForTv = false;
+        _player.play();
+      }
+      return KeyEventResult.handled;
+    }
     final name = mpvKeyName(event);
     if (name != null) {
       _mpv.command(['keypress', name]);
@@ -153,7 +257,7 @@ class _PlayerScreenState extends State<PlayerScreen> {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final file = widget.playlist[_index];
+    final item = widget.playlist[_index];
     return Scaffold(
       backgroundColor: Colors.black,
       body: Focus(
@@ -164,8 +268,8 @@ class _PlayerScreenState extends State<PlayerScreen> {
           children: [
             // mpv has no frame to draw its OSC on for music, and the video
             // surface would keep showing the previous video's last frame
-            if (kindOf(file) == MediaKind.audio)
-              _MusicView(player: _player, title: p.basename(file.path))
+            if (item.audio)
+              _MusicView(player: _player, title: item.title)
             else
               Video(controller: _video, controls: NoVideoControls, fill: Colors.black),
             if (_error != null)

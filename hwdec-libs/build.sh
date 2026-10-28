@@ -87,7 +87,7 @@ echo "amlogic-${FFMPEG_COMMIT:0:7}" > VERSION
     --disable-programs --enable-ffmpeg --enable-ffprobe \
     --disable-devices --enable-network --enable-gnutls \
     --enable-libdrm --enable-libudev --enable-v4l2-request --enable-v4l2-m2m \
-    --enable-libdav1d \
+    --enable-libdav1d --enable-libxml2 \
     --disable-vaapi --disable-vdpau --disable-vulkan --disable-xlib --disable-libxcb --disable-sdl2
 make -j"$JOBS"
 grep -q 'define CONFIG_V4L2_REQUEST 1' config.h || { echo "FFmpeg built without v4l2-request" >&2; exit 1; }

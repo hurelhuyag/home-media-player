@@ -6,7 +6,14 @@ HDMI and is driven with the **TV's own remote** over HDMI-CEC:
 - **YouTube** – YouTube TV (youtube.com/tv) in Chromium.
 - **Media** – browse SATA/USB disks, play videos and music (libmpv, with mpv's
   hotkeys and your own `input.conf`), view photos with a slideshow.
-- **Power** – restart or shut down.
+- **Internet TV** – live channels from M3U playlists, by list and category;
+  by default 37 Mongolian and 942 English-language channels from
+  [iptv/](iptv/README.md), downloaded
+  from this repository so dead channels can be fixed without updating the box.
+- **Power** – standby (the TV remote wakes it), restart or shut down.
+- **Follows the TV** – pauses when the TV switches to a channel or another
+  input and continues when it switches back; goes to standby when the TV
+  turns off and wakes when it comes back on this input.
 - **5.1 sound** – multichannel PCM to your TV or AV receiver.
 - **Hardware video decoding** (optional, needs a custom kernel) – H.264 and
   HEVC (also 10-bit) on the Amlogic decoder, see
@@ -77,6 +84,8 @@ The installer:
 - installs the packages from the latest release and their dependencies
   (Chromium, cage, mpv, …)
 - builds the 5.1 HDMI audio modules for the running kernel (DKMS)
+- adds a device tree overlay so HDMI recovers when the TV is switched on
+  ([kernel/hdmi-ddc-unwedge](kernel/hdmi-ddc-unwedge/README.md))
 - asks to reboot
 
 After the reboot the launcher appears on the TV and the box shows up as
@@ -102,9 +111,22 @@ them as `... | sudo bash -s -- --reboot`.
 In YouTube the remote works as in YouTube's own TV app. **Home** always comes
 back to the launcher.
 
+In **Internet TV**, OK on a channel starts it; **Channel up/down** (or
+⏮ ⏭) switches channels, Back returns to the list. A channel that can't be
+played shows its error.
+
 In file lists, **Left** opens the menu on the left (sort by name or date
 modified, shuffle, folders first or mixed with files) from anywhere in the
 list, and **Right** goes back to the row you were on.
+
+**Following the TV**: when the TV switches to a channel or another input, a
+playing video (local or YouTube) pauses, and continues when you select the
+box's input again; a video you paused yourself stays paused. When the TV
+turns off the box goes to standby: the HDMI output is switched off and the
+box keeps running quietly. Turning the TV on (on this input), selecting the
+input or pressing any remote key brings it back. **Power → Standby** does the
+same from the launcher. **Shut down** really powers off; the remote can't
+start the box again, only replugging the power does.
 
 Videos and music resume where you stopped (mpv's `save-position-on-quit`,
 saved every 30 s while playing, so also after a crash or power cut).
@@ -141,7 +163,7 @@ possible; audio on this kernel isn't tested yet.
 
 | File | What |
 |------|------|
-| `/etc/default/home-media-player` | HDMI mode, text size, folder bookmarks, YouTube options |
+| `/etc/default/home-media-player` | HDMI mode, text size, folder bookmarks, Internet TV playlists, YouTube options |
 | `/etc/home-media-player/mpv/mpv.conf` | player options (subtitle/audio language, …) |
 | `/etc/home-media-player/mpv/input.conf` | player keys, mpv syntax, on top of mpv's defaults |
 | `/etc/home-media-player/mpv/scripts/` | mpv Lua/JS scripts |
@@ -152,6 +174,10 @@ Apply changes with `systemctl restart home-media-player` (or
 
 ## Troubleshooting
 
+- **"Unsupported signal" or no remote after the TV was turned on**: the
+  HDMI link lost the TV's EDID. Check `user_overlays=hdmi-ddc-unwedge` in
+  `/boot/armbianEnv.txt`, see [kernel/hdmi-ddc-unwedge](kernel/hdmi-ddc-unwedge/README.md);
+  a reboot also clears it.
 - **No picture**: the box outputs 1080p60. Try another HDMI port or cable; with
   a 4K TV check that the port isn't limited by an "HDMI 2.0 / enhanced"
   setting. Logs: `journalctl -u home-media-player`.
@@ -190,13 +216,15 @@ sudo systemctl set-default multi-user.target
 | Directory | What |
 |-----------|------|
 | `kiosk/` | Flutter app, run full screen by [cage](https://github.com/cage-kiosk/cage) on tty1 |
-| `cec2uinput/` | C daemon: registers on the CEC bus and turns remote presses into keys of a virtual keyboard (uinput); uses `/dev/cec0` directly, no libcec |
+| `cec2uinput/` | C daemon: registers on the CEC bus and turns remote presses into keys of a virtual keyboard (uinput); uses `/dev/cec0` directly, no libcec. TV events become keys too: switched away `KEY_PAUSECD`, switched back `KEY_PLAYCD`, TV off `KEY_SCREENSAVER` (not `KEY_SLEEP`/`KEY_POWER`, which logind would act on) |
 | `kernel/hdmi-multichannel/` | DKMS package with the patched sound modules for 5.1 over HDMI |
 | `kernel/passthrough-research/` | notes and code from the passthrough attempt |
 | `kernel/hwdec-kernel/` | Armbian edge kernel with LibreELEC's decoder and HDMI audio patches |
+| `kernel/hdmi-ddc-unwedge/` | device tree overlay: HDMI EDID bus recovery after the TV powers up |
 | `kernel/sm1-vdec-experiment/` | notes from the hardware decoders that didn't work |
 | `hwdec-libs/` | FFmpeg and libmpv with the V4L2 request API (`hmp-hwdec-libs`) |
 | `build/` | packaging and local build scripts |
+| `iptv/` | Internet TV channel list the box downloads, and a stream checker |
 | `tools/` | `hdmi-channel-test` |
 
 **Releases** are built by GitHub Actions on arm64 runners: push a tag and the

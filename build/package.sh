@@ -91,6 +91,9 @@ install -Dm644 "$P/cursor/index.theme" "$PKG/usr/share/home-media-player/icons/d
 install -Dm644 "$P/mpv/mpv.conf" "$PKG/etc/home-media-player/mpv/mpv.conf"
 install -Dm644 "$P/mpv/input.conf" "$PKG/etc/home-media-player/mpv/input.conf"
 install -Dm644 "$P/mpv/scripts/README" "$PKG/etc/home-media-player/mpv/scripts/README"
+# Applied by install.sh with armbian-add-overlay (HC4 only)
+install -Dm644 "$ROOT/kernel/hdmi-ddc-unwedge/hdmi-ddc-unwedge.dts" \
+    "$PKG/usr/share/home-media-player/overlays/hdmi-ddc-unwedge.dts"
 cat > "$PKG/DEBIAN/control" <<EOF
 Package: home-media-player
 Version: $VERSION

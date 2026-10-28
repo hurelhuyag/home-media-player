@@ -5,6 +5,7 @@ import 'package:media_kit/media_kit.dart';
 import 'config.dart';
 import 'remote.dart';
 import 'screens/launcher_screen.dart';
+import 'standby.dart';
 import 'widgets.dart';
 import 'youtube.dart';
 
@@ -23,14 +24,25 @@ void main() {
     });
   }
 
-  // HOME on the remote always returns to the launcher, even from YouTube.
   GlobalRemoteListener(
     deviceName: config.remoteDeviceName,
-    onHome: () {
-      if (YouTube.instance.isRunning) {
-        YouTube.instance.close();
-      } else {
-        navigatorKey.currentState?.popUntil((r) => r.isFirst);
+    onKeyDown: (code) {
+      final standby = Standby.instance;
+      switch (code) {
+        case GlobalRemoteListener.keyScreenSaver:
+          standby.enter();
+        case GlobalRemoteListener.keyPauseCd:
+          break; // the player or YouTube pauses itself
+        case GlobalRemoteListener.keyHome when !standby.isActive:
+          // HOME always returns to the launcher, even from YouTube
+          if (YouTube.instance.isRunning) {
+            YouTube.instance.close();
+          } else {
+            navigatorKey.currentState?.popUntil((r) => r.isFirst);
+          }
+        default:
+          // The TV switching back to us, or any remote key, wakes it up
+          standby.exit();
       }
     },
   ).start();

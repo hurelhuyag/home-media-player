@@ -50,6 +50,7 @@ jobs:
           flutter --suppress-analytics config --no-analytics
           flutter --suppress-analytics pub get
           flutter --suppress-analytics analyze
+          flutter --suppress-analytics test
           flutter --suppress-analytics build linux --release
 
       - name: Package

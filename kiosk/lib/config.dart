@@ -61,10 +61,23 @@ class Config {
   /// e.g. `Downloads=/srv/torrents`.
   Map<String, String> get bookmarks => _pairs(_str('HMP_BOOKMARKS', ''));
 
+  /// Internet TV playlists (M3U), `Name=URL` separated by `;`. The default is
+  /// the curated list in this project's repository (iptv/), so channels can
+  /// be fixed without updating the box.
+  Map<String, String> get iptvPlaylists => _pairs(_str(
+        'HMP_IPTV_PLAYLISTS',
+        'Mongolia=https://raw.githubusercontent.com/hurelhuyag/home-media-player/main/iptv/mongolia.m3u;'
+            'English=https://raw.githubusercontent.com/hurelhuyag/home-media-player/main/iptv/english.m3u',
+      ));
+
   double get textScale => double.tryParse(_str('HMP_TEXT_SCALE', '')) ?? 1.5;
 
   /// Log every key event, handy for mapping a new TV remote.
   bool get debugKeys => _bool('HMP_DEBUG_KEYS', false);
+
+  /// HDMI mode the session script sets, and standby sets again when it turns
+  /// the output back on (empty: the preferred mode).
+  String get outputMode => _str('HMP_OUTPUT_MODE', '');
 
   /// Name of the virtual keyboard created by cec2uinput.
   String get remoteDeviceName => _str('HMP_REMOTE_DEVICE', 'cec2uinput');

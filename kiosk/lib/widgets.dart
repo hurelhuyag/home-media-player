@@ -72,9 +72,13 @@ class TvListItem extends StatelessWidget {
     required this.onSelect,
     this.autofocus = false,
     this.trailing,
+    this.leading,
   });
 
   final IconData icon;
+
+  /// Shown instead of [icon], e.g. a logo
+  final Widget? leading;
   final String title;
   final String? subtitle;
   final VoidCallback onSelect;
@@ -98,7 +102,7 @@ class TvListItem extends StatelessWidget {
                 padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
                 child: Row(
                   children: [
-                    Icon(icon, size: 36),
+                    leading ?? Icon(icon, size: 36),
                     const SizedBox(width: 20),
                     Expanded(
                       child: Column(
@@ -312,6 +316,22 @@ class _TvSideMenuLayoutState extends State<TvSideMenuLayout> {
           ),
         ),
       ],
+    );
+  }
+}
+
+/// Section heading in a [TvSideMenuLayout] menu.
+class TvMenuLabel extends StatelessWidget {
+  const TvMenuLabel(this.text, {super.key});
+
+  final String text;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 16, 16, 4),
+      child: Text(text, style: theme.textTheme.labelLarge?.copyWith(color: theme.hintColor)),
     );
   }
 }

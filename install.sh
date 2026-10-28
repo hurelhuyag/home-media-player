@@ -132,6 +132,20 @@ fi
 
 DEBIAN_FRONTEND=noninteractive apt-get install -y "${DEBS[@]}"
 
+# Lets the HDMI driver recover the EDID bus after the TV powers up; without it
+# the picture can be lost until a reboot (kernel/hdmi-ddc-unwedge)
+OVERLAY=/usr/share/home-media-player/overlays/hdmi-ddc-unwedge.dts
+if [ "$HC4" = 1 ] && [ -f "$ARMBIAN_ENV" ] && [ -f "$OVERLAY" ] && command -v armbian-add-overlay >/dev/null &&
+    ! grep -q '^user_overlays=.*hdmi-ddc-unwedge' "$ARMBIAN_ENV"; then
+    say "HDMI overlay"
+    command -v dtc >/dev/null || apt-get install -y device-tree-compiler
+    if armbian-add-overlay "$OVERLAY"; then
+        NEED_REBOOT=1
+    else
+        warn "couldn't add $OVERLAY; after the TV turns on the picture may need a reboot"
+    fi
+fi
+
 # ---- done -----------------------------------------------------------------------
 say "Done"
 echo "The launcher starts on HDMI. Use the TV remote (HDMI-CEC) or a keyboard."

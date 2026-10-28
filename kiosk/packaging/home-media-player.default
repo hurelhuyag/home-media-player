@@ -11,6 +11,12 @@ HMP_OUTPUT_MODE=1920x1080
 # Folders listed on the Media screen next to the disks, Name=/path;Name=/path
 #HMP_BOOKMARKS="Downloads=/srv/downloads"
 
+# Internet TV channel lists (M3U), Name=URL;Name=URL; a URL can also be a
+# local file. Default: the project's curated list (iptv/mongolia.m3u on
+# GitHub). iptv-org has lists per country, language and category, e.g.
+# News=https://iptv-org.github.io/iptv/categories/news.m3u
+#HMP_IPTV_PLAYLISTS="Mongolia=https://raw.githubusercontent.com/hurelhuyag/home-media-player/main/iptv/mongolia.m3u"
+
 # YouTube TV
 #HMP_YOUTUBE_URL=https://www.youtube.com/tv
 #HMP_YOUTUBE_USER_AGENT="Mozilla/5.0 (PS4; Leanback Shell) Gecko/20100101 Firefox/65.0 LeanbackShell/01.00.01.75 Sony PS4/ (PS4, , no, CH)"

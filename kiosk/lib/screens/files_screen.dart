@@ -136,10 +136,10 @@ class _FilesScreenState extends State<FilesScreen> {
       case MediaKind.audio:
         final playlist = _entries
             .where((e) => e.kind == MediaKind.video || e.kind == MediaKind.audio)
-            .map((e) => e.entity as File)
+            .map((e) => PlayItem.file(e.entity as File))
             .toList();
         nav.push(MaterialPageRoute(
-          builder: (_) => PlayerScreen(playlist: playlist, index: playlist.indexWhere((f) => f.path == entry.entity.path)),
+          builder: (_) => PlayerScreen(playlist: playlist, index: playlist.indexWhere((i) => i.uri == entry.entity.path)),
         ));
       case MediaKind.image:
         final images = _entries.where((e) => e.kind == MediaKind.image).map((e) => e.entity as File).toList();
@@ -171,7 +171,7 @@ class _FilesScreenState extends State<FilesScreen> {
               Expanded(
                 child: TvSideMenuLayout(
                   menu: [
-                    const _MenuLabel('Sort by'),
+                    const TvMenuLabel('Sort by'),
                     for (final sort in SortOrder.values)
                       TvMenuButton(
                         icon: sort.icon,
@@ -179,7 +179,7 @@ class _FilesScreenState extends State<FilesScreen> {
                         selected: sort == _sort,
                         onSelect: () => _setSort(sort: sort),
                       ),
-                    const _MenuLabel('Folders'),
+                    const TvMenuLabel('Folders'),
                     TvMenuButton(
                       icon: Icons.folder_copy,
                       label: 'Folders first',
@@ -226,21 +226,6 @@ class _FilesScreenState extends State<FilesScreen> {
           onSelect: () => _open(e),
         );
       },
-    );
-  }
-}
-
-class _MenuLabel extends StatelessWidget {
-  const _MenuLabel(this.text);
-
-  final String text;
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(16, 16, 16, 4),
-      child: Text(text, style: theme.textTheme.labelLarge?.copyWith(color: theme.hintColor)),
     );
   }
 }

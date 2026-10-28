@@ -37,8 +37,10 @@ class YouTube extends ChangeNotifier {
       '--user-agent=${config.youtubeUserAgent}',
       '--user-data-dir=${config.dataDir}/youtube-profile',
       '--load-extension=$extensionDir',
-      // Chromium 137+ ignores --load-extension unless this feature is off
-      '--disable-features=DisableLoadExtensionCommandLineSwitch,Translate,MediaRouter',
+      // Chromium 137+ ignores --load-extension unless this feature is off.
+      // HardwareMediaKeyHandling: media keys go to the page (page.js) instead
+      // of Chromium's own media session handling.
+      '--disable-features=DisableLoadExtensionCommandLineSwitch,Translate,MediaRouter,HardwareMediaKeyHandling',
       '--ignore-gpu-blocklist',
       '--enable-gpu-rasterization',
       '--autoplay-policy=no-user-gesture-required',

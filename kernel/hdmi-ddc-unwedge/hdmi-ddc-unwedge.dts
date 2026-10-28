@@ -1,0 +1,47 @@
+// SPDX-License-Identifier: GPL-2.0
+/*
+ * ODROID-HC4: lets dw-hdmi recover its DDC (EDID) I2C master when it wedges.
+ *
+ * A TV or receiver that powers up while connected can pull SDA and SCL low
+ * and release them without a STOP. The DesignWare I2C master then times out
+ * on every transfer (-EAGAIN): no EDID, a fallback mode the TV can't show and
+ * no CEC physical address, until a reboot. dw-hdmi pulses SDA through the
+ * "unwedge" pinctrl state when a transfer times out; Amlogic device trees
+ * don't define it. Here SDA (GPIOH_0) is driven low as a GPIO, and dw-hdmi
+ * switches back to "default" after 10 ms.
+ */
+/dts-v1/;
+/plugin/;
+
+/ {
+	compatible = "hardkernel,odroid-hc4", "amlogic,sm1";
+
+	fragment@0 {
+		target = <&periphs_pinctrl>;
+		__overlay__ {
+			hdmitx_ddc_unwedge_pins: hdmitx-ddc-unwedge {
+				mux-sda {
+					groups = "GPIOH_0";
+					function = "gpio_periphs";
+					bias-disable;
+					output-low;
+				};
+				mux-sck {
+					groups = "hdmitx_sck";
+					function = "hdmitx";
+					bias-disable;
+					drive-strength-microamp = <4000>;
+				};
+			};
+		};
+	};
+
+	fragment@1 {
+		target = <&hdmi_tx>;
+		__overlay__ {
+			pinctrl-0 = <&hdmitx_hpd_pins>, <&hdmitx_ddc_pins>;
+			pinctrl-1 = <&hdmitx_hpd_pins>, <&hdmitx_ddc_unwedge_pins>;
+			pinctrl-names = "default", "unwedge";
+		};
+	};
+};
